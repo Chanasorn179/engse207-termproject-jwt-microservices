@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📊 Log Dashboard — Task Board Week 12</title>
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --s2: #273448;
+            --border: #334155;
+            --text: #e2e8f0;
+            --muted: #94a3b8;
+            --blue: #3b82f6;
+            --green: #22c55e;
+            --yellow: #f59e0b;
+            --red: #ef4444;
+            --purple: #a855f7;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        a {
+            color: var(--blue);
+            text-decoration: none;
+        }
+
+        /* ── HEADER ── */
+        .header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .header h1 {
+            font-size: 1.2rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--green);
+            display: inline-block;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: .6;
+                transform: scale(1.3);
+            }
+        }
+
+        .header-actions {
+            margin-left: auto;
+            display: flex;
+            gap: .75rem;
+            align-items: center;
+        }
+
+        .btn-sm {
+            padding: .4rem .9rem;
+            border-radius: 7px;
+            font-size: .82rem;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all .15s;
+        }
+
+        .btn-outline {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--muted);
+        }
+
+        .btn-outline:hover {
+            border-color: var(--blue);
+            color: var(--blue);
+        }
+
+        .btn-red {
+            background: rgba(239, 68, 68, .15);
+            border: 1px solid rgba(239, 68, 68, .3);
+            color: #fca5a5;
+        }
+
+        .btn-red:hover {
+            background: rgba(239, 68, 68, .25);
+        }
+
+        .refresh-info {
+            font-size: .78rem;
+            color: var(--muted);
+        }
+
+        .countdown {
+            color: var(--blue);
+            font-weight: 600;
+        }
+
+        /* ── LAYOUT ── */
+        .layout {
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            gap: 1.5rem;
+            padding: 1.5rem;
+            min-height: calc(100vh - 60px);
+        }
+
+        /* ── SECTION ── */
+        .section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .section-header {
+            padding: .9rem 1.25rem;
+            background: var(--s2);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .section-header h2 {
+            font-size: .95rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+        }
+
+        .count-badge {
+            background: var(--blue);
+            color: white;
+            padding: 1px 8px;
+            border-radius: 999px;
+            font-size: .72rem;
+            font-weight: 700;
+        }
+
+        /* ── STATS STRIP ── */
+        .stats-strip {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: .75rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .stat-tile {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: .9rem 1rem;
+            text-align: center;
+        }
+
+        .stat-tile .num {
+            font-size: 1.7rem;
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        .stat-tile .lbl {
+            font-size: .72rem;
+            color: var(--muted);
+            margin-top: 4px;
+        }
+
+        .green {
+            color: var(--green);
+        }
+
+        .red {
+            color: var(--red);
+        }
+
+        .yellow {
+            color: var(--yellow);
+        }
+
+        .blue {
+            color: var(--blue);
+        }
+
+        .purple {
+            color: var(--purple);
+        }
+
+        /* ── LOG TABLE ── */
+        .log-scroll {
+            overflow-y: auto;
+            max-height: 480px;
+        }
+
+        .log-row {
+            display: grid;
+            grid-template-columns: 80px 50px 180px 60px 70px;
+            align-items: center;
+            padding: .5rem 1.25rem;
+            border-bottom: 1px solid rgba(255, 255, 255, .04);
+            font-family: monospace;
+            font-size: .78rem;
+            transition: background .15s;
+        }
+
+        .log-row:hover {
+            background: var(--s2);
+        }
+
+        .log-row .time {
+            color: var(--muted);
+        }
+
+        .method-GET {
+            color: #93c5fd;
+            font-weight: 700;
+        }
+
+        .method-POST {
+            color: #86efac;
+            font-weight: 700;
+        }
+
+        .method-PUT {
+            color: #fde68a;
+            font-weight: 700;
+        }
+
+        .method-DELETE {
+            color: #fca5a5;
+            font-weight: 700;
+        }
+
+        .url-cell {
+            color: var(--text);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .status-ok {
+            color: var(--green);
+            font-weight: 700;
+        }
+
+        .status-4xx {
+            color: var(--red);
+            font-weight: 700;
+        }
+
+        .status-5xx {
+            color: var(--yellow);
+            font-weight: 700;
+        }
+
+        .ms-cell {
+            color: var(--muted);
+            text-align: right;
+        }
+
+        .log-header {
+            display: grid;
+            grid-template-columns: 80px 50px 180px 60px 70px;
+            padding: .4rem 1.25rem;
+            background: var(--s2);
+            font-size: .7rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+        }
+
+        /* ── SECURITY EVENTS ── */
+        .sec-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .sec-row {
+            padding: .55rem 1.25rem;
+            border-bottom: 1px solid rgba(255, 255, 255, .04);
+            font-size: .8rem;
+            display: flex;
+            align-items: center;
+            gap: .75rem;
+        }
+
+        .sec-icon {
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+
+        .sec-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .sec-time {
+            color: var(--muted);
+            font-size: .7rem;
+            font-family: monospace;
+            flex-shrink: 0;
+        }
+
+        /* ── ENDPOINT STATS BAR ── */
+        .endpoint-list {
+            padding: 1rem 1.25rem;
+        }
+
+        .ep-row {
+            margin-bottom: .75rem;
+        }
+
+        .ep-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: .78rem;
+            margin-bottom: 3px;
+        }
+
+        .ep-label .ep-name {
+            font-family: monospace;
+        }
+
+        .ep-label .ep-count {
+            color: var(--muted);
+        }
+
+        .ep-bar-wrap {
+            height: 6px;
+            background: var(--s2);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .ep-bar {
+            height: 100%;
+            border-radius: 3px;
+            transition: width .3s;
+        }
+
+        .ep-color-0 {
+            background: #3b82f6;
+        }
+
+        .ep-color-1 {
+            background: #22c55e;
+        }
+
+        .ep-color-2 {
+            background: #f59e0b;
+        }
+
+        .ep-color-3 {
+            background: #a855f7;
+        }
+
+        .ep-color-4 {
+            background: #ef4444;
+        }
+
+        /* ── JWT INSPECTOR ── */
+        .jwt-section {
+            padding: 1.25rem;
+        }
+
+        .jwt-token-text {
+            font-family: monospace;
+            font-size: .7rem;
+            word-break: break-all;
+            background: var(--bg);
+            padding: .75rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            line-height: 1.6;
+            margin-bottom: 1rem;
+        }
+
+        .jwt-part-h {
+            color: #fca5a5;
+        }
+
+        .jwt-part-p {
+            color: #c4b5fd;
+        }
+
+        .jwt-part-s {
+            color: #93c5fd;
+        }
+
+        .jwt-payload-display {
+            background: var(--bg);
+            border-radius: 8px;
+            padding: .75rem;
+            border: 1px solid var(--border);
+        }
+
+        .jwt-payload-display table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: .78rem;
+        }
+
+        .jwt-payload-display td {
+            padding: .3rem .4rem;
+            vertical-align: top;
+        }
+
+        .jwt-payload-display td:first-child {
+            color: var(--muted);
+            font-weight: 600;
+            width: 60px;
+            white-space: nowrap;
+        }
+
+        .jwt-payload-display td:last-child {
+            color: var(--text);
+            word-break: break-all;
+        }
+
+        .exp-ok {
+            color: var(--green);
+            font-weight: 600;
+        }
+
+        .exp-warn {
+            color: var(--yellow);
+            font-weight: 600;
+        }
+
+        .exp-bad {
+            color: var(--red);
+            font-weight: 600;
+        }
+
+        .no-token {
+            padding: 1.5rem;
+            text-align: center;
+            color: var(--muted);
+            font-size: .85rem;
+        }
+
+        /* ── SIDE COLUMN ── */
+        .side-col {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        /* ── EMPTY ── */
+        .empty-log {
+            padding: 2.5rem;
+            text-align: center;
+            color: var(--muted);
+        }
+
+        .empty-log .big {
+            font-size: 2rem;
+            margin-bottom: .5rem;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- HEADER -->
+    <div class="header">
+        <h1>📊 Log Dashboard <span class="live-dot"></span></h1>
+        <span class="refresh-info">Auto-refresh ใน <span class="countdown" id="countdown">3</span>s</span>
+        <div class="header-actions">
+            <a href="index.html" class="btn-sm btn-outline">← กลับ Task Board</a>
+            <button class="btn-sm btn-outline" onclick="refreshNow()">🔄 Refresh</button>
+            <button class="btn-sm btn-red" onclick="clearLogs()">🗑️ ล้าง Logs</button>
+        </div>
+    </div>
+
+    <!-- MAIN LAYOUT -->
+    <div class="layout">
+
+        <!-- LEFT COLUMN: Stats + Log Table -->
+        <div style="display:flex;flex-direction:column;gap:1.25rem;">
+
+            <!-- Stats Strip -->
+            <div class="stats-strip">
+                <div class="stat-tile">
+                    <div class="num blue" id="s-total">0</div>
+                    <div class="lbl">Total Requests</div>
+                </div>
+                <div class="stat-tile">
+                    <div class="num green" id="s-2xx">0</div>
+                    <div class="lbl">2xx Success</div>
+                </div>
+                <div class="stat-tile">
+                    <div class="num red" id="s-4xx">0</div>
+                    <div class="lbl">4xx Error</div>
+                </div>
+                <div class="stat-tile">
+                    <div class="num yellow" id="s-401">0</div>
+                    <div class="lbl">401 Unauth</div>
+                </div>
+                <div class="stat-tile">
+                    <div class="num purple" id="s-403">0</div>
+                    <div class="lbl">403 Forbidden</div>
+                </div>
+            </div>
+
+            <!-- API Activity Log -->
+            <div class="section">
+                <div class="section-header">
+                    <h2>📡 API Activity Log</h2>
+                    <span class="count-badge" id="log-count">0</span>
+                </div>
+                <div class="log-header">
+                    <span>เวลา</span><span>Method</span><span>URL</span><span>Status</span><span>ms</span>
+                </div>
+                <div class="log-scroll" id="log-table">
+                    <div class="empty-log">
+                        <div class="big">📭</div>
+                        <p>ยังไม่มี API calls<br>ไปใช้งาน Task Board แล้วกลับมาดู</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Security Events -->
+            <div class="section">
+                <div class="section-header">
+                    <h2>🛡️ Security Events</h2>
+                    <span class="count-badge" id="sec-count" style="background:var(--red)">0</span>
+                </div>
+                <div class="sec-list" id="sec-list">
+                    <div class="sec-row"
+                        style="color:var(--muted);font-size:.82rem;justify-content:center;padding:1.5rem">
+                        ✅ ยังไม่มี Security Events
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- RIGHT COLUMN -->
+        <div class="side-col">
+
+            <!-- Endpoint Hit Counter -->
+            <div class="section">
+                <div class="section-header">
+                    <h2>📈 Endpoint Hits</h2>
+                </div>
+                <div class="endpoint-list" id="endpoint-stats">
+                    <p style="color:var(--muted);font-size:.82rem;text-align:center;padding:1rem">รอ data...</p>
+                </div>
+            </div>
+
+            <!-- JWT Inspector -->
+            <div class="section">
+                <div class="section-header">
+                    <h2>🔍 JWT Inspector</h2>
+                </div>
+                <div id="jwt-section">
+                    <div class="no-token">ยังไม่มี Token<br><a href="index.html">ไป Login ก่อน →</a></div>
+                </div>
+            </div>
+
+            <!-- Legend -->
+            <div class="section">
+                <div class="section-header">
+                    <h2>📖 Legend</h2>
+                </div>
+                <div style="padding:1rem 1.25rem;font-size:.8rem;line-height:2">
+                    <div><span class="method-GET">GET</span> — ดึงข้อมูล (Read)</div>
+                    <div><span class="method-POST">POST</span> — สร้างข้อมูลใหม่</div>
+                    <div><span class="method-PUT">PUT</span> — แก้ไขข้อมูล</div>
+                    <div><span class="method-DELETE">DELETE</span> — ลบข้อมูล</div>
+                    <hr style="border-color:var(--border);margin:.5rem 0">
+                    <div><span class="status-ok">2xx</span> — สำเร็จ</div>
+                    <div><span class="status-4xx">401</span> — ไม่มี / Token หมดอายุ</div>
+                    <div><span class="status-4xx">403</span> — ไม่มีสิทธิ์ (Role)</div>
+                    <div><span class="status-4xx">429</span> — Rate Limit เกิน</div>
+                    <div><span class="status-5xx">5xx</span> — Server Error</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+const LOG_KEY = 'taskboard_api_log';
+let countdown  = 3;
+let timer      = null;
+
+function getLogs() {
+  return JSON.parse(localStorage.getItem(LOG_KEY) || '[]');
+}
+
+function clearLogs() {
+  if (confirm('ล้าง API log ทั้งหมดหรือ?')) {
+    localStorage.removeItem(LOG_KEY);
+    renderAll();
+  }
+}
+
+function refreshNow() {
+  countdown = 3;
+  renderAll();
+}
+
+/* ─── MAIN RENDER ─── */
+function renderAll() {
+  const logs = getLogs();
+  renderStats(logs);
+  renderLogTable(logs);
+  renderSecurityEvents(logs);
+  renderEndpointStats(logs);
+  renderJwt();
+  document.getElementById('log-count').textContent = logs.length;
+}
+
+/* ─── STATS ─── */
+function renderStats(logs) {
+  const total = logs.length;
+  const s2xx  = logs.filter(l => l.status >= 200 && l.status < 300).length;
+  const s4xx  = logs.filter(l => l.status >= 400 && l.status < 500).length;
+  const s401  = logs.filter(l => l.status === 401).length;
+  const s403  = logs.filter(l => l.status === 403).length;
+  document.getElementById('s-total').textContent = total;
+  document.getElementById('s-2xx').textContent   = s2xx;
+  document.getElementById('s-4xx').textContent   = s4xx;
+  document.getElementById('s-401').textContent   = s401;
+  document.getElementById('s-403').textContent   = s403;
+}
+
+/* ─── LOG TABLE ─── */
+function renderLogTable(logs) {
+  const el = document.getElementById('log-table');
+  if (logs.length === 0) {
+    el.innerHTML = '<div class="empty-log"><div class="big">📭</div><p>ยังไม่มี API calls<br>ไปใช้งาน Task Board แล้วกลับมาดู</p></div>';
+    return;
+  }
+
+  el.innerHTML = logs.slice(0, 100).map(l => {
+    const t    = new Date(l.time).toLocaleTimeString('th-TH');
+    const mCls = `method-${l.method}`;
+    const sCls = l.status >= 500 ? 'status-5xx' : l.status >= 400 ? 'status-4xx' : 'status-ok';
+    const path = (l.url || '/').replace(/^https?:\/\/[^/]+/, '');
+    const ms   = l.duration || 0;
+    return `<div class="log-row">
+      <span class="time">${t}</span>
+      <span class="${mCls}">${l.method}</span>
+      <span class="url-cell" title="${esc(l.url)}">${esc(path)}</span>
+      <span class="${sCls}">${l.status || 'ERR'}</span>
+      <span class="ms-cell">${ms}ms</span>
+    </div>`;
+  }).join('');
+}
+
+/* ─── SECURITY EVENTS ─── */
+function renderSecurityEvents(logs) {
+  const events = logs.filter(l => [401, 403, 429, 0].includes(l.status));
+  document.getElementById('sec-count').textContent = events.length;
+
+  const el = document.getElementById('sec-list');
+  if (events.length === 0) {
+    el.innerHTML = '<div class="sec-row" style="color:var(--muted);justify-content:center;padding:1.5rem">✅ ไม่มี Security Events</div>';
+    return;
+  }
+
+  const secConfig = {
+    401: { icon: '🔑', label: 'Unauthorized',   color: '#fbbf24' },
+    403: { icon: '🚫', label: 'Forbidden',       color: '#fca5a5' },
+    429: { icon: '⚡', label: 'Rate Limited',    color: '#f97316' },
+    0:   { icon: '❌', label: 'Network Error',   color: '#94a3b8' },
+  };
+
+  el.innerHTML = events.slice(0, 30).map(l => {
+    const cfg  = secConfig[l.status] || { icon: '⚠️', label: `HTTP ${l.status}`, color: '#94a3b8' };
+    const t    = new Date(l.time).toLocaleTimeString('th-TH');
+    const path = (l.url || '/').replace(/^https?:\/\/[^/]+/, '');
+    return `<div class="sec-row">
+      <span class="sec-icon">${cfg.icon}</span>
+      <div class="sec-info">
+        <div style="font-weight:600;color:${cfg.color}">${cfg.label} (${l.status})</div>
+        <div style="color:var(--muted);font-size:.72rem;font-family:monospace">${l.method} ${esc(path)}</div>
+      </div>
+      <span class="sec-time">${t}</span>
+    </div>`;
+  }).join('');
+}
+
+/* ─── ENDPOINT STATS ─── */
+function renderEndpointStats(logs) {
+  if (logs.length === 0) {
+    document.getElementById('endpoint-stats').innerHTML =
+      '<p style="color:var(--muted);font-size:.82rem;text-align:center;padding:1rem">รอ data...</p>';
+    return;
+  }
+
+  // Count by normalized endpoint
+  const counts = {};
+  logs.forEach(l => {
+    const path = (l.url || '/').replace(/^https?:\/\/[^/]+/, '').replace(/\/\d+/g, '/:id');
+    const key  = `${l.method} ${path}`;
+    counts[key] = (counts[key] || 0) + 1;
+  });
+
+  const sorted = Object.entries(counts).sort((a,b) => b[1]-a[1]).slice(0, 8);
+  const maxVal = sorted[0]?.[1] || 1;
+
+  document.getElementById('endpoint-stats').innerHTML = sorted.map(([ep, cnt], i) => `
+    <div class="ep-row">
+      <div class="ep-label">
+        <span class="ep-name">${esc(ep)}</span>
+        <span class="ep-count">${cnt} hits</span>
+      </div>
+      <div class="ep-bar-wrap">
+        <div class="ep-bar ep-color-${i % 5}" style="width:${Math.round(cnt/maxVal*100)}%"></div>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ─── JWT INSPECTOR ─── */
+function renderJwt() {
+  const token = localStorage.getItem('jwt_token');
+  const el    = document.getElementById('jwt-section');
+  if (!token) {
+    el.innerHTML = '<div class="no-token">ยังไม่มี Token<br><a href="index.html">ไป Login ก่อน →</a></div>';
+    return;
+  }
+
+  const parts = token.split('.');
+  if (parts.length !== 3) {
+    el.innerHTML = '<div class="no-token">Token format ผิด</div>';
+    return;
+  }
+
+  let payload;
+  try { payload = JSON.parse(atob(parts[1])); }
+  catch(e) { el.innerHTML = '<div class="no-token">Decode ไม่ได้</div>'; return; }
+
+  const expMs   = payload.exp * 1000;
+  const msLeft  = expMs - Date.now();
+  const minLeft = Math.round(msLeft / 60000);
+  let expCls, expTxt;
+  if (msLeft < 0)       { expCls = 'exp-bad';  expTxt = '❌ หมดอายุแล้ว!'; }
+  else if (minLeft < 5) { expCls = 'exp-warn'; expTxt = `⚠️ หมดใน ${minLeft} นาที`; }
+  else                  { expCls = 'exp-ok';   expTxt = `✅ หมดใน ${minLeft} นาที`; }
+
+  el.innerHTML = `
+    <div class="jwt-section">
+      <p style="font-size:.72rem;color:var(--muted);margin-bottom:.6rem">🔴 Header . 🟣 Payload . 🔵 Signature</p>
+      <div class="jwt-token-text">
+        <span class="jwt-part-h">${parts[0]}</span><span style="color:var(--muted)">.</span><span class="jwt-part-p">${parts[1]}</span><span style="color:var(--muted)">.</span><span class="jwt-part-s">${parts[2]}</span>
+      </div>
+      <div class="jwt-payload-display">
+        <table>
+          <tr><td>sub</td><td>${esc(payload.sub||'—')}</td></tr>
+          <tr><td>email</td><td>${esc(payload.email||'—')}</td></tr>
+          <tr><td>role</td><td>${esc(payload.role||'—')}</td></tr>
+          <tr><td>iat</td><td>${new Date(payload.iat*1000).toLocaleString('th-TH')}</td></tr>
+          <tr><td>exp</td><td><span class="${expCls}">${expTxt}</span></td></tr>
+        </table>
+      </div>
+      <p style="font-size:.72rem;color:var(--muted);margin-top:.75rem">
+        💡 Payload อ่านได้โดยไม่ต้องมี Secret — ห้ามใส่ข้อมูลลับ!
+      </p>
+    </div>
+  `;
+}
+
+/* ─── UTILS ─── */
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ─── AUTO-REFRESH ─── */
+function tick() {
+  countdown--;
+  document.getElementById('countdown').textContent = countdown;
+  if (countdown <= 0) {
+    countdown = 3;
+    renderAll();
+  }
+}
+
+renderAll();
+timer = setInterval(tick, 1000);
+    </script>
+</body>
+
+</html>

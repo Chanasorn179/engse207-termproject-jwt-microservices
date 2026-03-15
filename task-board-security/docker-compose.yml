@@ -1,0 +1,225 @@
+name: task-board-security
+
+# ─────────────────────────────────────────────────────────────────
+# ✅ v2.0: ใช้ Loki Docker Driver Plugin แทน Promtail
+# ทำงานได้ทั้ง macOS, WSL2, Linux
+#
+# ⚠️ ต้องติดตั้ง plugin ก่อน:
+# docker plugin install grafana/loki-docker-driver:latest \
+#   --alias loki --grant-all-permissions
+# ─────────────────────────────────────────────────────────────────
+
+# ─── Logging config template (ใช้ซ้ำใน x-logging) ───────────────
+x-logging: &loki-logging
+  driver: loki
+  options:
+    loki-url: "http://localhost:3100/loki/api/v1/push"
+    loki-external-labels: "compose_project=task-board-security,service={{.Name}}"
+    loki-retries: "5"
+    loki-batch-size: "400"
+    max-size: "10m"
+    max-file: "3"
+
+services:
+
+  # ─────────── API Gateway ───────────
+  nginx:
+    build: ./nginx
+    container_name: taskboard-gateway
+    ports:
+      - "${GATEWAY_PORT:-90}:90"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      task-service:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+    networks:
+      - taskboard-net
+    logging: *loki-logging
+
+  # ─────────── Auth Service ───────────
+  auth-service:
+    build: ./auth-service
+    container_name: taskboard-auth
+    environment:
+      PORT: 3001
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES: ${JWT_EXPIRES:-1h}
+      DB_HOST: auth-db
+      DB_NAME: ${AUTH_DB_NAME}
+      DB_USER: ${AUTH_DB_USER}
+      DB_PASSWORD: ${AUTH_DB_PASSWORD}
+    depends_on:
+      auth-db:
+        condition: service_healthy
+    networks:
+      - taskboard-net
+    logging: *loki-logging
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/api/auth/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  auth-db:
+    image: postgres:15-alpine
+    container_name: taskboard-auth-db
+    environment:
+      POSTGRES_DB: ${AUTH_DB_NAME}
+      POSTGRES_USER: ${AUTH_DB_USER}
+      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD}
+    volumes:
+      - auth-db-data:/var/lib/postgresql/data
+    networks:
+      - taskboard-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AUTH_DB_USER} -d ${AUTH_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ─────────── Task Service ───────────
+  task-service:
+    build: ./task-service
+    container_name: taskboard-task
+    environment:
+      PORT: 3002
+      JWT_SECRET: ${JWT_SECRET}
+      DB_HOST: task-db
+      DB_NAME: ${TASK_DB_NAME}
+      DB_USER: ${TASK_DB_USER}
+      DB_PASSWORD: ${TASK_DB_PASSWORD}
+    volumes:
+      # ✨ v2.0: mount shared authMiddleware แทนการ copy
+      - ./shared/authMiddleware.js:/app/src/middleware/authMiddleware.js:ro
+    depends_on:
+      task-db:
+        condition: service_healthy
+    networks:
+      - taskboard-net
+    logging: *loki-logging
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3002/api/tasks/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  task-db:
+    image: postgres:15-alpine
+    container_name: taskboard-task-db
+    environment:
+      POSTGRES_DB: ${TASK_DB_NAME}
+      POSTGRES_USER: ${TASK_DB_USER}
+      POSTGRES_PASSWORD: ${TASK_DB_PASSWORD}
+    volumes:
+      - task-db-data:/var/lib/postgresql/data
+    networks:
+      - taskboard-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TASK_DB_USER} -d ${TASK_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ─────────── User Service ───────────
+  user-service:
+    build: ./user-service
+    container_name: taskboard-user
+    environment:
+      PORT: 3003
+      JWT_SECRET: ${JWT_SECRET}
+      DB_HOST: user-db
+      DB_NAME: ${USER_DB_NAME}
+      DB_USER: ${USER_DB_USER}
+      DB_PASSWORD: ${USER_DB_PASSWORD}
+    volumes:
+      # ✨ v2.0: mount shared authMiddleware แทนการ copy
+      - ./shared/authMiddleware.js:/app/src/middleware/authMiddleware.js:ro
+    depends_on:
+      user-db:
+        condition: service_healthy
+    networks:
+      - taskboard-net
+    logging: *loki-logging
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3003/api/users/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  user-db:
+    image: postgres:15-alpine
+    container_name: taskboard-user-db
+    environment:
+      POSTGRES_DB: ${USER_DB_NAME}
+      POSTGRES_USER: ${USER_DB_USER}
+      POSTGRES_PASSWORD: ${USER_DB_PASSWORD}
+    volumes:
+      - user-db-data:/var/lib/postgresql/data
+    networks:
+      - taskboard-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${USER_DB_USER} -d ${USER_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ─────────── Monitoring: Loki ───────────
+  # ✅ v2.0: ลบ user: "0000:0000" ที่ผิด syntax
+  # ใช้ default user ของ Loki image (10001) ซึ่งตรงกับ volume permission
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: taskboard-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./monitoring/loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - taskboard-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3100/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ─────────── Monitoring: Grafana ───────────
+  # ✅ v2.0: เพิ่ม dashboards provisioning volume
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: taskboard-grafana
+    ports:
+      - "${GRAFANA_PORT:-3030}:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_LOG_LEVEL: warn
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+    networks:
+      - taskboard-net
+    depends_on:
+      loki:
+        condition: service_healthy
+
+networks:
+  taskboard-net:
+    driver: bridge
+
+volumes:
+  auth-db-data:
+  task-db-data:
+  user-db-data:
+  grafana-data:
+  loki-data:
